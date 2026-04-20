@@ -1,0 +1,160 @@
+import type { Express } from "express";
+import type { Server } from "http";
+import session from "express-session";
+import MemoryStore from "memorystore";
+import { storage } from "./storage";
+
+const MemStore = MemoryStore(session);
+
+export function registerRoutes(httpServer: Server, app: Express): Server {
+  app.use(session({
+    secret: "arva-sourdough-forum-secret-2026",
+    resave: false,
+    saveUninitialized: false,
+    store: new MemStore({ checkPeriod: 86400000 }),
+    cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 },
+  }));
+
+  // ─── Auth ─────────────────────────────────────────────
+  app.post("/api/auth/register", (req, res) => {
+    const { username, email, displayName, password } = req.body;
+    if (!username || !email || !displayName || !password) {
+      return res.status(400).json({ error: "All fields are required." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters." });
+    }
+    if (storage.getUserByEmail(email)) {
+      return res.status(400).json({ error: "Email already registered." });
+    }
+    if (storage.getUserByUsername(username)) {
+      return res.status(400).json({ error: "Username already taken." });
+    }
+    const user = storage.createUser({ username, email, displayName, password });
+    (req.session as any).userId = user.id;
+    const { passwordHash, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  app.post("/api/auth/login", (req, res) => {
+    const { email, password } = req.body;
+    const user = storage.getUserByEmail(email);
+    if (!user || !storage.verifyPassword(user, password)) {
+      return res.status(401).json({ error: "Invalid email or password." });
+    }
+    (req.session as any).userId = user.id;
+    const { passwordHash, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => res.json({ ok: true }));
+  });
+
+  app.get("/api/auth/me", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+    const user = storage.getUserById(userId);
+    if (!user) return res.status(401).json({ error: "User not found" });
+    const { passwordHash, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  // ─── Categories ───────────────────────────────────────
+  app.get("/api/categories", (_req, res) => {
+    res.json(storage.getCategories());
+  });
+
+  // ─── Threads ──────────────────────────────────────────
+  app.get("/api/categories/:slug/threads", (req, res) => {
+    const threads = storage.getThreadsByCategory(req.params.slug);
+    res.json(threads);
+  });
+
+  app.get("/api/threads/:id", (req, res) => {
+    const thread = storage.getThreadById(Number(req.params.id));
+    if (!thread) return res.status(404).json({ error: "Thread not found" });
+    storage.incrementViewCount(thread.id);
+    res.json(thread);
+  });
+
+  app.post("/api/threads", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const { title, categoryId, content, imageUrl } = req.body;
+    if (!title?.trim() || !content?.trim() || !categoryId) {
+      return res.status(400).json({ error: "Title, category and content are required." });
+    }
+    // Validate base64 image if provided (max ~5MB base64 = ~3.75MB file)
+    if (imageUrl && imageUrl.length > 7 * 1024 * 1024) {
+      return res.status(400).json({ error: "Image is too large. Please use an image under 5 MB." });
+    }
+    const thread = storage.createThread({ title: title.trim(), categoryId: Number(categoryId), authorId: userId, content: content.trim(), imageUrl: imageUrl || undefined });
+    res.json(thread);
+  });
+
+  // ─── Posts ─────────────────────────────────────────────
+  app.get("/api/threads/:id/posts", (req, res) => {
+    const userId = (req.session as any).userId;
+    const posts = (storage as any).getPostsByThread(Number(req.params.id), userId);
+    res.json(posts);
+  });
+
+  app.post("/api/threads/:id/posts", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const { content, imageUrl } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: "Content is required." });
+    const thread = storage.getThreadById(Number(req.params.id));
+    if (!thread) return res.status(404).json({ error: "Thread not found" });
+    if (thread.isLocked) return res.status(403).json({ error: "Thread is locked." });
+    if (imageUrl && imageUrl.length > 7 * 1024 * 1024) {
+      return res.status(400).json({ error: "Image is too large. Please use an image under 5 MB." });
+    }
+    const post = storage.createPost({ threadId: Number(req.params.id), authorId: userId, content: content.trim(), imageUrl: imageUrl || undefined });
+    res.json(post);
+  });
+
+  // ─── Likes ─────────────────────────────────────────────
+  app.post("/api/posts/:id/like", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const result = storage.toggleLike(Number(req.params.id), userId);
+    res.json(result);
+  });
+
+  // ─── Search ─────────────────────────────────────────────
+  app.get("/api/search", (req, res) => {
+    const q = String(req.query.q || "").trim();
+    if (!q) return res.json([]);
+    res.json(storage.searchThreads(q));
+  });
+
+  // ─── Waitlist ────────────────────────────────────────────
+  app.post("/api/waitlist", (req, res) => {
+    const { name, email } = req.body;
+    if (!name?.trim() || !email?.trim()) {
+      return res.status(400).json({ error: "Name and email are required." });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+    const result = storage.addToWaitlist({ name, email });
+    if (result.duplicate) {
+      return res.status(409).json({ error: "This email is already on the waitlist." });
+    }
+    res.json({ ok: true });
+  });
+
+  // Admin-only: view waitlist
+  app.get("/api/waitlist", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const user = storage.getUserById(userId);
+    if (!user || user.role !== "admin") return res.status(403).json({ error: "Admin only" });
+    res.json(storage.getWaitlist());
+  });
+
+  return httpServer;
+}
