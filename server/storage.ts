@@ -87,11 +87,25 @@ try { sqlite.exec(`ALTER TABLE threads ADD COLUMN flair TEXT`); } catch (_) {}
 const existingCategories = db.select().from(categories).all();
 if (existingCategories.length === 0) {
   db.insert(categories).values([
+    { name: "New Bakers", description: "Just starting out? Welcome! Find guides, tips, and encouragement for your first sourdough journey.", slug: "new-bakers", icon: "Sprout", color: "bg-green-50 text-green-700", sortOrder: 0 },
     { name: "Flour & Ingredients", description: "Discuss different flour types, grains, hydration levels and how they affect your bake.", slug: "flour-ingredients", icon: "Wheat", color: "amber", sortOrder: 1 },
-    { name: "Sourdough Recipes", description: "Share your favourite recipes — loaves, flatbreads, discard creations and everything in between.", slug: "sourdough-recipes", icon: "BookOpen", color: "orange", sortOrder: 2 },
-    { name: "Troubleshooting", description: "Starter not bubbling? Dense crumb? Bring your challenges here and get help from the community.", slug: "troubleshooting", icon: "HelpCircle", color: "rose", sortOrder: 3 },
-    { name: "Workshop Alumni", description: "A dedicated space for participants of our in-person sourdough workshops at Arva Flour Mills.", slug: "workshop-alumni", icon: "GraduationCap", color: "teal", sortOrder: 4 },
+    { name: "Sourdough Recipes", description: "Share your favourite recipes — loaves, flatbreads, discard creations and everything in between.", slug: "sourdough-recipes", icon: "ChefHat", color: "orange", sortOrder: 2 },
+    { name: "Troubleshooting", description: "Starter not bubbling? Dense crumb? Bring your challenges here and get help from the community.", slug: "troubleshooting", icon: "FlaskConical", color: "rose", sortOrder: 3 },
+    { name: "Workshop Alumni", description: "A dedicated space for participants of our in-person sourdough workshops at Arva Flour Mills.", slug: "workshop-alumni", icon: "HandHeart", color: "teal", sortOrder: 4 },
+    { name: "Discard Recipes", description: "Don't throw it away — bake with it. Pancakes, crackers, waffles, pizza dough and more.", slug: "discard-recipes", icon: "Recycle", color: "bg-amber-50 text-amber-700", sortOrder: 5 },
+    { name: "Bake Journals", description: "Keep a running log of your bakes. One thread per baker — document your progress, wins, and lessons.", slug: "bake-journals", icon: "BookOpen", color: "bg-blue-50 text-blue-700", sortOrder: 6 },
   ]).run();
+}
+
+// Migration: add any new categories that may be missing from older DBs
+const categorySlugsInDb = db.select().from(categories).all().map((c: any) => c.slug);
+const newCategoriesToAdd = [
+  { name: "New Bakers", description: "Just starting out? Welcome! Find guides, tips, and encouragement for your first sourdough journey.", slug: "new-bakers", icon: "Sprout", color: "bg-green-50 text-green-700", sortOrder: 0 },
+  { name: "Discard Recipes", description: "Don't throw it away — bake with it. Pancakes, crackers, waffles, pizza dough and more.", slug: "discard-recipes", icon: "Recycle", color: "bg-amber-50 text-amber-700", sortOrder: 5 },
+  { name: "Bake Journals", description: "Keep a running log of your bakes. One thread per baker — document your progress, wins, and lessons.", slug: "bake-journals", icon: "BookOpen", color: "bg-blue-50 text-blue-700", sortOrder: 6 },
+].filter((c: any) => !categorySlugsInDb.includes(c.slug));
+if (newCategoriesToAdd.length > 0) {
+  db.insert(categories).values(newCategoriesToAdd).run();
 }
 
 // Hash password
@@ -347,6 +361,101 @@ if (adminUserForSeed) {
 
       offset2 += 10;
     }
+  }
+}
+
+// ─── Seed new content (New Bakers guides, Discard recipes, Bake Journal, May Group Bake) ───
+// Safe: each block checks for thread existence before inserting
+const adminSeed = db.select().from(users).where(eq(users.username, "admin")).get();
+if (adminSeed) {
+  const NOW_SEED = Date.now();
+
+  const newBakersCat = db.select().from(categories).where(eq(categories.slug, "new-bakers")).get();
+  const discardCat = db.select().from(categories).where(eq(categories.slug, "discard-recipes")).get();
+  const bakeJournalCat = db.select().from(categories).where(eq(categories.slug, "bake-journals")).get();
+  const recipeCatSeed = db.select().from(categories).where(eq(categories.slug, "sourdough-recipes")).get();
+
+  function seedThread(title: string, catId: number, content: string, isPinned = 1) {
+    const exists = db.select().from(threads)
+      .where(eq(threads.title, title))
+      .get();
+    if (exists) return;
+    const thread = db.insert(threads).values({
+      title, categoryId: catId, authorId: adminSeed!.id,
+      isPinned, isLocked: 0, viewCount: 0, replyCount: 0,
+      createdAt: NOW_SEED,
+    }).returning().get();
+    db.insert(posts).values({
+      threadId: thread.id, authorId: adminSeed!.id, content,
+      isFirstPost: 1, likeCount: 0, createdAt: NOW_SEED,
+    }).run();
+  }
+
+  // ── New Bakers ──
+  if (newBakersCat) {
+    seedThread(
+      "\uD83D\uDC4B Welcome to the Arva Sourdough Community \u2014 Read This First",
+      newBakersCat.id,
+      `Welcome to the Arva Sourdough Community \u2014 we're glad you're here.\n\nThis forum was built for bakers of every level, from those who've never touched a starter to those who've been baking for decades.\n\n**A few things to know:**\n\n\uD83C\uDF3E **All skill levels are welcome.** There are no silly questions here. Whether your loaf came out flat, gummy, too sour, or didn't rise at all \u2014 post it. We don't shame loaves; we help fix them.\n\n\uD83D\uDCF8 **Photos are encouraged.** Crumb shots, starters, scoring patterns, even the disasters \u2014 share them.\n\n\uD83C\uDFE1 **This is a community, not a competition.** Be generous with your knowledge, patient with beginners, and kind in your feedback.\n\n\uD83C\uDF31 **New to sourdough?** Check out the pinned guides in this category.\n\n\uD83C\uDFED **About Arva Flour Mills:** We've been milling flour at our stone mill in Arva, Ontario since 1819. Visit our [Flour Guide](https://arvaflourmills.com/pages/flour-guide) to learn more.\n\nHappy baking. \uD83C\uDF5E\n\n*\u2014 Arva Flour Mills*`
+    );
+    seedThread(
+      "How to Start and Maintain a Sourdough Starter",
+      newBakersCat.id,
+      `Your starter is a living culture of wild yeast and beneficial bacteria \u2014 the heart of every sourdough loaf.\n\n## What You Need\n- Clean glass jar (500mL+)\n- Kitchen scale\n- Arva All-Purpose or Whole Wheat Flour\n- Unchlorinated water\n\n## Day 1\nMix 50g flour + 50g water. Cover loosely. Leave at room temperature (21\u201324\u00b0C).\n\n## Days 2\u20137 \u2014 Daily Feeding\nDiscard all but 50g, then feed: 50g flour + 50g water. Stir well, cover loosely.\n\n**Signs of progress:**\n- Days 1\u20132: Little activity. Normal.\n- Days 2\u20134: Bubbles appear. May smell unpleasant \u2014 normal.\n- Days 5\u20137: Consistent bubbles, pleasant tangy smell, regular rise and fall.\n\n## Ready to Bake When:\n1. Doubles within 4\u20138 hours of feeding\n2. Domed top at peak\n3. Passes the float test \u2014 drop a spoonful in water; if it floats, it's ready\n\n## Long-Term Storage\n- **Baking often:** Keep on counter, feed daily.\n- **Baking occasionally:** Store in fridge, feed weekly.\n- **Going away?** Feed well, refrigerate. Fine for 2\u20133 weeks.\n\n*\u2014 Arva Flour Mills | [Flour Guide](https://arvaflourmills.com/pages/flour-guide)*`
+    );
+    seedThread(
+      "Your First Sourdough Loaf \u2014 A Step-by-Step Walkthrough",
+      newBakersCat.id,
+      `You have an active starter. Time to bake your first loaf.\n\n## Ingredients\n- 450g Arva All-Purpose Flour\n- 325g water (72% hydration)\n- 100g active starter\n- 9g salt\n\n## Steps\n1. **Autolyse (30 min):** Mix flour and water. Rest covered.\n2. **Add starter + salt:** Squeeze through fingers until incorporated.\n3. **Stretch & fold:** Every 30 min \u00d7 4 sets over 2 hours.\n4. **Bulk ferment:** 4\u20136 more hours until 50\u201375% growth.\n5. **Pre-shape:** Fold edges under, bench rest 20 min.\n6. **Final shape:** Shape into boule, place seam-up in floured banneton.\n7. **Cold proof:** Refrigerate overnight (8\u201316 hours).\n8. **Bake:** Preheat Dutch oven to 250\u00b0C. Bake covered 20 min, lid off at 230\u00b0C for 20\u201325 min.\n9. **Cool 1 hour** before slicing.\n\nYour first loaf probably won't look like Instagram. That's normal \u2014 post a photo here and we'll help you read what happened.\n\n*\u2014 Arva Flour Mills*`
+    );
+    seedThread(
+      "Reading Your Crumb \u2014 What Your Loaf Is Telling You",
+      newBakersCat.id,
+      `The crumb is a map of everything that happened during fermentation.\n\n## What to Look For\n- **Dense, few bubbles:** Underfermented or starter not active enough.\n- **Large holes + gummy patches:** Underfermented. More bulk time needed.\n- **Dense, gummy throughout:** Overfermented or underbaked.\n- **Even tight crumb:** Often correct for whole grain or lower hydration.\n- **Tunnelling (one large hole):** Shaping issue \u2014 air trapped.\n- **Collapsed/torn:** Overproofed.\n\n## The Fastest Way to Improve\nKeep a simple bake log: date, flour, hydration, bulk time + temp, crumb photo. After 5\u20136 bakes you'll see your own patterns.\n\nPost crumb photos here \u2014 experienced bakers can often diagnose a fermentation issue from a photo in seconds.\n\n*\u2014 Arva Flour Mills*`
+    );
+    seedThread(
+      "What to Do With Your Discard (and Why You Should Save It)",
+      newBakersCat.id,
+      `Discard is starter removed before each feeding. Most beginners throw it away. Once you know what you can make with it, you never will again.\n\n## What Is Discard?\nLess active starter, full of flavour. Adds tang and depth to baked goods using chemical leavening.\n\n## How to Store It\nSeparate jar in the fridge, up to 2 weeks. Add to it every time you feed your starter.\n\n## What You Can Make\n**Quick (under 30 min):** Pancakes, waffles, crackers, flatbread\n**Baking:** Banana bread, muffins, chocolate chip cookies, cinnamon rolls\n**Savoury:** Crepes, pizza dough, onion ring batter\n\nHead to the **Discard Recipes** category for recipes using Arva flour. We'd love for you to share your own favourites too.\n\n*\u2014 Arva Flour Mills*`
+    );
+  }
+
+  // ── Discard Recipes ──
+  if (discardCat) {
+    seedThread(
+      "Sourdough Discard Pancakes \u2014 Light, Tangy, and Perfect Every Time",
+      discardCat.id,
+      `The best pancakes you'll ever make. The discard adds a subtle tang that regular pancakes don't have.\n\n## Ingredients (serves 2\u20133)\n- 150g sourdough discard\n- 120ml milk\n- 1 large egg\n- 1 tbsp melted butter\n- 1 tsp vanilla\n- 1 tbsp maple syrup or sugar\n- 120g Arva All-Purpose Flour\n- 1 tsp baking powder\n- \u00bd tsp baking soda\n- Pinch of salt\n\n## Instructions\n1. Whisk discard, milk, egg, butter, vanilla, and sugar until smooth.\n2. In a separate bowl whisk flour, baking powder, baking soda, and salt.\n3. Fold dry into wet \u2014 do not overmix. Rest 5 min.\n4. Cook on medium-heat buttered skillet ~2\u20133 min per side.\n\n## Tips\n- Older discard = more tang\n- Add blueberries or chocolate chips before cooking\n- Batter keeps overnight in the fridge\n\n*Uses: [Arva All-Purpose Flour](https://arvaflourmills.com/products/all-purpose-flour)*`
+    );
+    seedThread(
+      "Sourdough Discard Crackers \u2014 Crispy, Seeded, and Endlessly Customizable",
+      discardCat.id,
+      `30 minutes, uses up a good amount of discard, tastes far better than anything from a box.\n\n## Ingredients (~40 crackers)\n- 200g sourdough discard\n- 60g Arva All-Purpose Flour\n- 40g melted butter or olive oil\n- \u00bd tsp salt\n- Toppings: sesame seeds, flax, everything bagel seasoning, rosemary, flaky sea salt\n\n## Instructions\n1. Preheat oven to 175\u00b0C (350\u00b0F).\n2. Mix all ingredients into a cohesive dough.\n3. Roll as thin as possible (~2mm) between parchment sheets.\n4. Remove top parchment, add toppings, score into cracker shapes.\n5. Bake 25\u201335 min until golden. Crisp further as they cool.\n\n**Variations:** Whole wheat, parmesan, herbs, spicy\n\n*Uses: [Arva All-Purpose Flour](https://arvaflourmills.com/products/all-purpose-flour)*`
+    );
+    seedThread(
+      "Sourdough Discard Banana Bread \u2014 Moist, Tangy, and Perfect for Overripe Bananas",
+      discardCat.id,
+      `Two pantry problems solved at once.\n\n## Ingredients (one 9\u00d75 loaf)\n- 3 very ripe bananas (~300g), mashed\n- 150g sourdough discard\n- 2 eggs\n- 100g butter, melted\n- 150g brown sugar\n- 1 tsp vanilla\n- 250g Arva All-Purpose Flour\n- 1 tsp baking soda\n- \u00bd tsp salt\n- 1 tsp cinnamon\n- Optional: 100g walnuts or chocolate chips\n\n## Instructions\n1. Preheat 175\u00b0C (350\u00b0F). Grease a loaf pan.\n2. Mash bananas, whisk in discard, eggs, butter, sugar, and vanilla.\n3. Fold in flour, baking soda, salt, cinnamon. Do not overmix.\n4. Fold in walnuts/chips if using. Pour into pan.\n5. Bake 55\u201365 min until a toothpick comes out clean.\n6. Cool 30 min before slicing.\n\n*Uses: [Arva All-Purpose Flour](https://arvaflourmills.com/products/all-purpose-flour)*`,
+      0
+    );
+  }
+
+  // ── Bake Journals ──
+  if (bakeJournalCat) {
+    seedThread(
+      "\uD83D\uDCD6 How to Use This Category \u2014 Your Personal Bake Journal",
+      bakeJournalCat.id,
+      `Welcome to Bake Journals \u2014 one of the most valuable things you can do as a developing baker is keep a record of your bakes.\n\n## How It Works\n**Start one thread with your name** (e.g. \"Sarah's Bake Journal\") and add to it over time. Every bake: what you made, what you changed, what happened, a photo if you have one.\n\n## What to Include\n- Date and recipe\n- Flour used (which Arva flour, blend)\n- Hydration %\n- Starter health \u2014 time since last feed\n- Bulk fermentation time + temperature\n- What changed from last time\n- Result + crumb photo\n- What to try next time\n\n## Why It Matters\nThe difference between a baker who improves quickly and one who stays stuck is almost always the bake journal.\n\n**To start:** Create a new thread in this category with your name in the title.\n\n*\u2014 Arva Flour Mills*`
+    );
+  }
+
+  // ── May Group Bake ──
+  if (recipeCatSeed) {
+    seedThread(
+      "\uD83C\uDF5E May Group Bake \u2014 Classic Sourdough Loaf",
+      recipeCatSeed.id,
+      `Welcome to our first Arva Community Group Bake \u2014 kicking off with the Classic Sourdough Loaf.\n\n## The Challenge\nBake the Classic Sourdough Loaf this month using Arva flour. Share your results here \u2014 photos, notes, questions, wins, and honest failures all welcome.\n\n## How to Participate\n1. Bake the loaf any time this month (May 2026)\n2. Reply below with a photo + a few notes\n3. Ask questions, offer tips, celebrate each other's bakes\n\n## Tell Us:\n- Which Arva flour did you use?\n- Any modifications?\n- How did your bulk fermentation go?\n- Crumb photo if you have one\n- One thing you'd do differently next time\n\nWe'll run a group bake every month with a different recipe.\n\nLet's bake. \uD83C\uDF3E\n\n*\u2014 Arva Flour Mills*`
+    );
   }
 }
 
