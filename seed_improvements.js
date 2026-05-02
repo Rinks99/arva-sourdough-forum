@@ -100,7 +100,7 @@ This forum was built for bakers of every level, from those who've never touched 
 
 🌱 **New to sourdough?** Start in this New Bakers category. Check out the pinned guides below — they'll walk you through everything from building your first starter to your first bake.
 
-🏭 **About Arva Flour Mills:** We've been milling flour in Arva, Ontario since 1819 — originally by stone mill, and by roller mill since 1901. Our flours are milled from 100% Canadian grain and we take great pride in the quality and consistency that goes into every bag. You'll find our [Flour Guide](https://arvaflourmills.com/pages/flour-guide) helpful when selecting the right flour for your bakes.
+🏭 **About Arva Flour Mills:** Canada's oldest commercial Flour Mill. Farm to Table since 1819. Our flours are milled from 100% Canadian grain and we take great pride in the quality and consistency that goes into every bag. You'll find our [Flour Guide](https://arvaflourmills.com/pages/flour-guide) helpful when selecting the right flour for your bakes.
 
 **Explore the categories:**
 - **Flour & Ingredients** — talk flour, water, salt, and starters
