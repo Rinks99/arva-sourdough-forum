@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ChevronRight, CheckCircle2, Users, Wheat, ChefHat, FlaskConical, HandHeart, GraduationCap } from "lucide-react";
+import { ChevronRight, CheckCircle2, Users, Wheat, ChefHat, FlaskConical, HandHeart, GraduationCap, Sprout, Recycle, BookOpen } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,17 +12,32 @@ import { useAuth } from "@/components/AuthContext";
 
 const ICON_MAP: Record<string, any> = {
   Wheat,
-  BookOpen: ChefHat,
+  ChefHat,
+  FlaskConical,
+  HandHeart,
+  Sprout,
+  Recycle,
+  BookOpen,
+  GraduationCap,
+  // legacy fallback mappings
   HelpCircle: FlaskConical,
-  GraduationCap: HandHeart,
 };
 
-const COLOR_MAP: Record<string, string> = {
+// For new categories the color field is a full Tailwind class string — use it directly.
+// For legacy categories using colour names, map to red brand colour.
+const LEGACY_COLOR_MAP: Record<string, string> = {
   amber: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   orange: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   rose: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   teal: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
+
+function resolveColorClass(color: string): string {
+  // If it's a legacy single-word colour name, map it
+  if (LEGACY_COLOR_MAP[color]) return LEGACY_COLOR_MAP[color];
+  // Otherwise treat the whole string as Tailwind classes (e.g. "bg-green-50 text-green-700")
+  return color;
+}
 
 interface Category {
   id: number;
@@ -210,7 +225,7 @@ export default function HomePage() {
           <div className="space-y-2">
             {categories?.map(cat => {
               const Icon = ICON_MAP[cat.icon] || Wheat;
-              const colorClass = COLOR_MAP[cat.color] || COLOR_MAP.amber;
+              const colorClass = resolveColorClass(cat.color);
               return (
                 <Link key={cat.id} href={`/category/${cat.slug}`}>
                   <Card className="hover:shadow-sm transition-shadow cursor-pointer group" data-testid={`card-category-${cat.id}`}>
