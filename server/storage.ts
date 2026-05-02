@@ -360,7 +360,7 @@ export interface IStorage {
   // Threads
   getThreadsByCategory(categorySlug: string): (Thread & { author: User; category: Category })[];
   getThreadById(id: number): (Thread & { author: User; category: Category }) | undefined;
-  createThread(data: { title: string; categoryId: number; authorId: number; content: string }): Thread;
+  createThread(data: { title: string; categoryId: number; authorId: number; content: string; imageUrl?: string; flair?: string }): Thread;
   incrementViewCount(threadId: number): void;
   deleteThread(threadId: number): void;
   setPinned(threadId: number, pinned: boolean): void;
@@ -443,12 +443,13 @@ export const storage: IStorage = {
     return { ...thread, author, category: cat };
   },
 
-  createThread({ title, categoryId, authorId, content, imageUrl }: { title: string; categoryId: number; authorId: number; content: string; imageUrl?: string }) {
+  createThread({ title, categoryId, authorId, content, imageUrl, flair }: { title: string; categoryId: number; authorId: number; content: string; imageUrl?: string; flair?: string }) {
     const now = Date.now();
     const thread = db.insert(threads).values({
       title,
       categoryId,
       authorId,
+      flair: flair || null,
       isPinned: 0,
       isLocked: 0,
       viewCount: 0,

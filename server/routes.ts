@@ -107,7 +107,7 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     if (!userId) return res.status(401).json({ error: "Login required" });
     const poster = storage.getUserById(userId);
     if (poster?.role === "banned") return res.status(403).json({ error: "Your account has been suspended." });
-    const { title, categoryId, content, imageUrl } = req.body;
+    const { title, categoryId, content, imageUrl, flair } = req.body;
     if (!title?.trim() || !content?.trim() || !categoryId) {
       return res.status(400).json({ error: "Title, category and content are required." });
     }
@@ -115,7 +115,7 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     if (imageUrl && imageUrl.length > 7 * 1024 * 1024) {
       return res.status(400).json({ error: "Image is too large. Please use an image under 5 MB." });
     }
-    const thread = storage.createThread({ title: title.trim(), categoryId: Number(categoryId), authorId: userId, content: content.trim(), imageUrl: imageUrl || undefined });
+    const thread = storage.createThread({ title: title.trim(), categoryId: Number(categoryId), authorId: userId, content: content.trim(), imageUrl: imageUrl || undefined, flair: flair || undefined });
     res.json(thread);
   });
 

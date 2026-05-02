@@ -37,12 +37,27 @@ export const insertCategorySchema = createInsertSchema(categories).omit({ id: tr
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
 
+// Available thread flairs
+export const THREAD_FLAIRS = [
+  "Beginner",
+  "Recipe",
+  "Photo Share",
+  "Discard Recipe",
+  "Tip",
+  "Question",
+  "Troubleshooting",
+  "Bake Journal",
+  "Workshop",
+] as const;
+export type ThreadFlair = typeof THREAD_FLAIRS[number];
+
 // Threads (topics)
 export const threads = sqliteTable("threads", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   categoryId: integer("category_id").notNull(),
   authorId: integer("author_id").notNull(),
+  flair: text("flair"), // optional flair label
   isPinned: integer("is_pinned").notNull().default(0),
   isLocked: integer("is_locked").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),

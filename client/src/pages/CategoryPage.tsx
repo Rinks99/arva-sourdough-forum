@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { MessageSquare, Eye, Pin, Lock, PenSquare, ChevronLeft, MoreVertical, Trash2, PinOff } from "lucide-react";
+import { MessageSquare, Eye, Pin, Lock, PenSquare, ChevronLeft, MoreVertical, Trash2, PinOff, Tag } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 interface Thread {
   id: number;
   title: string;
+  flair: string | null;
   isPinned: number;
   isLocked: number;
   viewCount: number;
@@ -24,6 +25,27 @@ interface Thread {
   lastReplyAt: number | null;
   author: { displayName: string; username: string };
   category: { name: string; slug: string };
+}
+
+const FLAIR_COLOURS: Record<string, string> = {
+  "Beginner":      "bg-green-100 text-green-800 border-green-200",
+  "Recipe":        "bg-amber-100 text-amber-800 border-amber-200",
+  "Photo Share":   "bg-sky-100 text-sky-800 border-sky-200",
+  "Discard Recipe":"bg-orange-100 text-orange-800 border-orange-200",
+  "Tip":           "bg-purple-100 text-purple-800 border-purple-200",
+  "Question":      "bg-blue-100 text-blue-800 border-blue-200",
+  "Troubleshooting":"bg-red-100 text-red-800 border-red-200",
+  "Bake Journal":  "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "Workshop":      "bg-rose-100 text-rose-800 border-rose-200",
+};
+
+function FlairBadge({ flair }: { flair: string }) {
+  const cls = FLAIR_COLOURS[flair] || "bg-muted text-muted-foreground border-border";
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border font-medium shrink-0 ${cls}`}>
+      <Tag className="w-2.5 h-2.5" />{flair}
+    </span>
+  );
 }
 
 export default function CategoryPage() {
@@ -127,6 +149,7 @@ export default function CategoryPage() {
                           {thread.isLocked === 1 && (
                             <Badge variant="secondary" className="text-xs h-5 gap-1"><Lock className="w-3 h-3" />Locked</Badge>
                           )}
+                          {thread.flair && <FlairBadge flair={thread.flair} />}
                           <h3 className="font-medium text-sm group-hover:text-primary transition-colors">{thread.title}</h3>
                         </div>
                         <p className="text-xs text-muted-foreground">

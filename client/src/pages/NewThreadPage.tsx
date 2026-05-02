@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { THREAD_FLAIRS } from "@shared/schema";
 import { useAuth } from "@/components/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -95,6 +96,7 @@ export default function NewThreadPage() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [flair, setFlair] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const { data: categories } = useQuery<Category[]>({
@@ -111,6 +113,7 @@ export default function NewThreadPage() {
         categoryId: Number(resolvedCategoryId),
         content: content.trim(),
         ...(imageUrl ? { imageUrl } : {}),
+        ...(flair ? { flair } : {}),
       });
       return res.json();
     },
@@ -155,6 +158,20 @@ export default function NewThreadPage() {
                 <SelectItem key={cat.id} value={String(cat.id)} data-testid={`option-category-${cat.id}`}>
                   {cat.name}
                 </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="flair">Tag <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Select value={flair} onValueChange={setFlair}>
+            <SelectTrigger id="flair" data-testid="select-flair">
+              <SelectValue placeholder="Choose a tag…" />
+            </SelectTrigger>
+            <SelectContent>
+              {THREAD_FLAIRS.map(f => (
+                <SelectItem key={f} value={f} data-testid={`option-flair-${f}`}>{f}</SelectItem>
               ))}
             </SelectContent>
           </Select>
