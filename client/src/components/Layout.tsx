@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
-import { Search, Sun, Moon, Menu, X, Wheat, LogOut, User, PenSquare } from "lucide-react";
+import { Search, Sun, Moon, Menu, X, Wheat, LogOut, User, PenSquare, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/ThemeProvider";
@@ -72,6 +72,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {user ? (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground hidden sm:block max-w-[100px] truncate">{user.displayName}</span>
+                {user.role === "admin" && (
+                  <Button variant="ghost" size="icon" asChild className="h-8 w-8" aria-label="Admin panel" data-testid="button-admin-panel">
+                    <Link href="/admin"><Shield className="w-4 h-4 text-primary" /></Link>
+                  </Button>
+                )}
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => logout()} aria-label="Log out" data-testid="button-logout">
                   <LogOut className="w-4 h-4" />
                 </Button>

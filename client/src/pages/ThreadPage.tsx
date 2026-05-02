@@ -1,12 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useParams, Link } from "wouter";
-import { ChevronLeft, Heart, Lock, Pin, Send, Eye, ImageIcon, X } from "lucide-react";
+import { useParams, Link, useLocation } from "wouter";
+import { ChevronLeft, Heart, Lock, Pin, Send, Eye, ImageIcon, X, MoreVertical, Trash2, PinOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/components/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -37,7 +40,6 @@ interface Thread {
 }
 
 function formatContent(content: string) {
-  // Linkify URLs in content
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   return content.split("\n").map((line, i, arr) => {
     const parts = line.split(urlRegex);
@@ -63,56 +65,27 @@ function ImagePicker({ onImageChange }: { onImageChange: (dataUrl: string | null
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Please choose an image under 5 MB.");
-      return;
-    }
+    if (file.size > 5 * 1024 * 1024) { alert("Please choose an image under 5 MB."); return; }
     const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      setPreview(dataUrl);
-      onImageChange(dataUrl);
-    };
+    reader.onload = () => { const dataUrl = reader.result as string; setPreview(dataUrl); onImageChange(dataUrl); };
     reader.readAsDataURL(file);
   };
 
-  const clear = () => {
-    setPreview(null);
-    onImageChange(null);
-    if (inputRef.current) inputRef.current.value = "";
-  };
+  const clear = () => { setPreview(null); onImageChange(null); if (inputRef.current) inputRef.current.value = ""; };
 
   return (
     <div className="flex items-center gap-2">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleFile}
-        data-testid="input-image-file"
-      />
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} data-testid="input-image-file" />
       {preview ? (
         <div className="relative inline-block">
           <img src={preview} alt="Preview" className="h-16 w-16 object-cover rounded-md border border-border" />
-          <button
-            type="button"
-            onClick={clear}
-            className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 text-muted-foreground hover:text-destructive"
-            data-testid="button-remove-image"
-          >
+          <button type="button" onClick={clear} className="absolute -top-1.5 -right-1.5 bg-background border border-border rounded-full p-0.5 text-muted-foreground hover:text-destructive" data-testid="button-remove-image">
             <X className="w-3 h-3" />
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-dashed border-border rounded-md px-3 py-2 transition-colors"
-          data-testid="button-attach-image"
-        >
-          <ImageIcon className="w-3.5 h-3.5" />
-          Attach photo
+        <button type="button" onClick={() => inputRef.current?.click()} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary border border-dashed border-border rounded-md px-3 py-2 transition-colors" data-testid="button-attach-image">
+          <ImageIcon className="w-3.5 h-3.5" /> Attach photo
         </button>
       )}
     </div>
@@ -124,38 +97,30 @@ export default function ThreadPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const [reply, setReply] = useState("");
   const [replyImage, setReplyImage] = useState<string | null>(null);
+  const isAdmin = user?.role === "admin";
 
   const { data: thread, isLoading: threadLoading } = useQuery<Thread>({
     queryKey: ["/api/threads", id],
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/threads/${id}`);
-      return res.json();
-    },
+    queryFn: async () => { const res = await apiRequest("GET", `/api/threads/${id}`); return res.json(); },
   });
 
   const { data: posts, isLoading: postsLoading } = useQuery<Post[]>({
     queryKey: ["/api/threads", id, "posts"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", `/api/threads/${id}/posts`);
-      return res.json();
-    },
+    queryFn: async () => { const res = await apiRequest("GET", `/api/threads/${id}/posts`); return res.json(); },
   });
 
   const replyMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/threads/${id}/posts`, {
-        content: reply.trim(),
-        ...(replyImage ? { imageUrl: replyImage } : {}),
-      });
+      const res = await apiRequest("POST", `/api/threads/${id}/posts`, { content: reply.trim(), ...(replyImage ? { imageUrl: replyImage } : {}) });
       return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/threads", id, "posts"] });
       qc.invalidateQueries({ queryKey: ["/api/threads", id] });
-      setReply("");
-      setReplyImage(null);
+      setReply(""); setReplyImage(null);
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -173,30 +138,79 @@ export default function ThreadPage() {
     onError: () => toast({ title: "Sign in to like posts", variant: "destructive" }),
   });
 
-  const handleReply = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reply.trim()) return;
-    replyMutation.mutate();
-  };
+  const deletePostMutation = useMutation({
+    mutationFn: async (postId: number) => { await apiRequest("DELETE", `/api/posts/${postId}`); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/threads", id, "posts"] });
+      qc.invalidateQueries({ queryKey: ["/api/threads", id] });
+      toast({ title: "Post deleted" });
+    },
+    onError: () => toast({ title: "Error deleting post", variant: "destructive" }),
+  });
+
+  const deleteThreadMutation = useMutation({
+    mutationFn: async () => { await apiRequest("DELETE", `/api/threads/${id}`); },
+    onSuccess: () => {
+      toast({ title: "Thread deleted" });
+      navigate(`/category/${thread?.category?.slug}`);
+    },
+    onError: () => toast({ title: "Error deleting thread", variant: "destructive" }),
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: async (pinned: boolean) => { await apiRequest("PATCH", `/api/threads/${id}/pin`, { pinned }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/threads", id] }); toast({ title: "Thread updated" }); },
+  });
+
+  const lockMutation = useMutation({
+    mutationFn: async (locked: boolean) => { await apiRequest("PATCH", `/api/threads/${id}/lock`, { locked }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/threads", id] }); toast({ title: "Thread updated" }); },
+  });
 
   if (threadLoading) return (
-    <div className="space-y-4">
-      <Skeleton className="h-8 w-2/3" />
-      <Skeleton className="h-32" />
-    </div>
+    <div className="space-y-4"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-32" /></div>
   );
 
   return (
     <div className="space-y-5">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm">
-        <Link href="/" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
-          <ChevronLeft className="w-3.5 h-3.5" /> Home
-        </Link>
-        <span className="text-muted-foreground">/</span>
-        <Link href={`/category/${thread?.category?.slug}`} className="text-muted-foreground hover:text-primary transition-colors capitalize">
-          {thread?.category?.name}
-        </Link>
+      {/* Breadcrumb + admin thread actions */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm flex-1 min-w-0">
+          <Link href="/" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1 shrink-0">
+            <ChevronLeft className="w-3.5 h-3.5" /> Home
+          </Link>
+          <span className="text-muted-foreground">/</span>
+          <Link href={`/category/${thread?.category?.slug}`} className="text-muted-foreground hover:text-primary transition-colors capitalize truncate">
+            {thread?.category?.name}
+          </Link>
+        </div>
+
+        {/* Admin thread actions */}
+        {isAdmin && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs shrink-0" data-testid="button-admin-thread-actions">
+                <MoreVertical className="w-3.5 h-3.5" /> Moderate
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onClick={() => pinMutation.mutate(thread?.isPinned !== 1)} className="gap-2 text-xs">
+                {thread?.isPinned === 1 ? <><PinOff className="w-3.5 h-3.5" /> Unpin thread</> : <><Pin className="w-3.5 h-3.5" /> Pin thread</>}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => lockMutation.mutate(thread?.isLocked !== 1)} className="gap-2 text-xs">
+                <Lock className="w-3.5 h-3.5" />
+                {thread?.isLocked === 1 ? "Unlock thread" : "Lock thread"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => { if (confirm("Delete this entire thread? This cannot be undone.")) deleteThreadMutation.mutate(); }}
+                className="gap-2 text-xs text-destructive focus:text-destructive"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete thread
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Thread title */}
@@ -235,11 +249,28 @@ export default function ThreadPage() {
                       <span className="text-xs text-muted-foreground ml-auto">
                         {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
                       </span>
+                      {/* Admin: delete post */}
+                      {isAdmin && post.isFirstPost !== 1 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" data-testid={`button-admin-post-${post.id}`}>
+                              <MoreVertical className="w-3 h-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuItem
+                              onClick={() => { if (confirm("Delete this post?")) deletePostMutation.mutate(post.id); }}
+                              className="gap-2 text-xs text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete post
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                     <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
                       {formatContent(post.content)}
                     </div>
-                    {/* Photo display */}
                     {post.imageUrl && (
                       <div className="mt-3">
                         <img
@@ -279,7 +310,7 @@ export default function ThreadPage() {
           <Lock className="w-4 h-4" /> This thread is locked.
         </div>
       ) : user ? (
-        <form onSubmit={handleReply} className="space-y-3">
+        <form onSubmit={e => { e.preventDefault(); if (!reply.trim()) return; replyMutation.mutate(); }} className="space-y-3">
           <Textarea
             placeholder="Share your thoughts, experience, or advice..."
             value={reply}

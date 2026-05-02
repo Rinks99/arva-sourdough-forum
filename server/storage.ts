@@ -362,10 +362,14 @@ export interface IStorage {
   getThreadById(id: number): (Thread & { author: User; category: Category }) | undefined;
   createThread(data: { title: string; categoryId: number; authorId: number; content: string }): Thread;
   incrementViewCount(threadId: number): void;
+  deleteThread(threadId: number): void;
+  setPinned(threadId: number, pinned: boolean): void;
+  setLocked(threadId: number, locked: boolean): void;
   
   // Posts
   getPostsByThread(threadId: number, userId?: number): (Post & { author: User; likedByMe: boolean })[];
   createPost(data: { threadId: number; authorId: number; content: string; imageUrl?: string }): Post;
+  deletePost(postId: number): void;
   
   // Likes
   toggleLike(postId: number, userId: number): { liked: boolean; likeCount: number };
@@ -376,6 +380,13 @@ export interface IStorage {
   // Waitlist
   addToWaitlist(data: { name: string; email: string }): { ok: boolean; duplicate: boolean };
   getWaitlist(): Waitlist[];
+
+  // Admin
+  getAllUsers(): User[];
+  getAllThreads(): (Thread & { author: User; category: Category })[];
+  setUserRole(userId: number, role: string): void;
+  banUser(userId: number): void;
+  getAdminStats(): { totalUsers: number; totalThreads: number; totalPosts: number; waitlistCount: number };
 }
 
 export const storage: IStorage = {
@@ -515,6 +526,57 @@ export const storage: IStorage = {
       const updated = db.select().from(posts).where(eq(posts.id, postId)).get()!;
       return { liked: true, likeCount: updated.likeCount };
     }
+  },
+
+  deleteThread(threadId) {
+    sqlite.prepare("DELETE FROM posts WHERE thread_id = ?").run(threadId);
+    sqlite.prepare("DELETE FROM threads WHERE id = ?").run(threadId);
+  },
+
+  setPinned(threadId, pinned) {
+    sqlite.prepare("UPDATE threads SET is_pinned = ? WHERE id = ?").run(pinned ? 1 : 0, threadId);
+  },
+
+  setLocked(threadId, locked) {
+    sqlite.prepare("UPDATE threads SET is_locked = ? WHERE id = ?").run(locked ? 1 : 0, threadId);
+  },
+
+  deletePost(postId) {
+    const post = db.select().from(posts).where(eq(posts.id, postId)).get();
+    if (post) {
+      sqlite.prepare("UPDATE threads SET reply_count = MAX(0, reply_count - 1) WHERE id = ?").run(post.threadId);
+      sqlite.prepare("DELETE FROM likes WHERE post_id = ?").run(postId);
+      sqlite.prepare("DELETE FROM posts WHERE id = ?").run(postId);
+    }
+  },
+
+  getAllUsers() {
+    return db.select().from(users).orderBy(desc(users.createdAt)).all();
+  },
+
+  getAllThreads() {
+    const threadList = db.select().from(threads).orderBy(desc(threads.createdAt)).all();
+    return threadList.map(t => {
+      const author = db.select().from(users).where(eq(users.id, t.authorId)).get()!;
+      const cat = db.select().from(categories).where(eq(categories.id, t.categoryId)).get()!;
+      return { ...t, author, category: cat };
+    });
+  },
+
+  setUserRole(userId, role) {
+    sqlite.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, userId);
+  },
+
+  banUser(userId) {
+    sqlite.prepare("UPDATE users SET role = 'banned' WHERE id = ?").run(userId);
+  },
+
+  getAdminStats() {
+    const totalUsers = (sqlite.prepare("SELECT COUNT(*) as c FROM users").get() as any).c;
+    const totalThreads = (sqlite.prepare("SELECT COUNT(*) as c FROM threads").get() as any).c;
+    const totalPosts = (sqlite.prepare("SELECT COUNT(*) as c FROM posts").get() as any).c;
+    const waitlistCount = (sqlite.prepare("SELECT COUNT(*) as c FROM waitlist").get() as any).c;
+    return { totalUsers, totalThreads, totalPosts, waitlistCount };
   },
 
   searchThreads(query) {

@@ -10,6 +10,7 @@ import CategoryPage from "@/pages/CategoryPage";
 import ThreadPage from "@/pages/ThreadPage";
 import NewThreadPage from "@/pages/NewThreadPage";
 import SearchPage from "@/pages/SearchPage";
+import AdminPage from "@/pages/AdminPage";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
               <Route path="/thread/:id" component={ThreadPage} />
               <Route path="/new-thread" component={NewThreadPage} />
               <Route path="/search" component={SearchPage} />
+              <Route path="/admin" component={AdminPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>

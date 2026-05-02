@@ -81,6 +81,8 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
   app.post("/api/threads", (req, res) => {
     const userId = (req.session as any).userId;
     if (!userId) return res.status(401).json({ error: "Login required" });
+    const poster = storage.getUserById(userId);
+    if (poster?.role === "banned") return res.status(403).json({ error: "Your account has been suspended." });
     const { title, categoryId, content, imageUrl } = req.body;
     if (!title?.trim() || !content?.trim() || !categoryId) {
       return res.status(400).json({ error: "Title, category and content are required." });
@@ -103,6 +105,8 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
   app.post("/api/threads/:id/posts", (req, res) => {
     const userId = (req.session as any).userId;
     if (!userId) return res.status(401).json({ error: "Login required" });
+    const poster = storage.getUserById(userId);
+    if (poster?.role === "banned") return res.status(403).json({ error: "Your account has been suspended." });
     const { content, imageUrl } = req.body;
     if (!content?.trim()) return res.status(400).json({ error: "Content is required." });
     const thread = storage.getThreadById(Number(req.params.id));
@@ -154,6 +158,75 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     const user = storage.getUserById(userId);
     if (!user || user.role !== "admin") return res.status(403).json({ error: "Admin only" });
     res.json(storage.getWaitlist());
+  });
+
+  // ─── Admin helpers ───────────────────────────────────────
+  function requireAdmin(req: any, res: any): boolean {
+    const userId = (req.session as any).userId;
+    if (!userId) { res.status(401).json({ error: "Login required" }); return false; }
+    const user = storage.getUserById(userId);
+    if (!user || user.role !== "admin") { res.status(403).json({ error: "Admin only" }); return false; }
+    return true;
+  }
+
+  // Admin stats
+  app.get("/api/admin/stats", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    res.json(storage.getAdminStats());
+  });
+
+  // Admin: all users
+  app.get("/api/admin/users", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const allUsers = storage.getAllUsers();
+    res.json(allUsers.map(({ passwordHash, ...u }) => u));
+  });
+
+  // Admin: set user role
+  app.patch("/api/admin/users/:id/role", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const { role } = req.body;
+    if (!role || !['member', 'admin', 'banned'].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+    storage.setUserRole(Number(req.params.id), role);
+    res.json({ ok: true });
+  });
+
+  // Admin: all threads
+  app.get("/api/admin/threads", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    res.json(storage.getAllThreads());
+  });
+
+  // Admin: delete thread
+  app.delete("/api/threads/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    storage.deleteThread(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // Admin: pin/unpin thread
+  app.patch("/api/threads/:id/pin", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const { pinned } = req.body;
+    storage.setPinned(Number(req.params.id), !!pinned);
+    res.json({ ok: true });
+  });
+
+  // Admin: lock/unlock thread
+  app.patch("/api/threads/:id/lock", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const { locked } = req.body;
+    storage.setLocked(Number(req.params.id), !!locked);
+    res.json({ ok: true });
+  });
+
+  // Admin: delete post
+  app.delete("/api/posts/:id", (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    storage.deletePost(Number(req.params.id));
+    res.json({ ok: true });
   });
 
   return httpServer;
