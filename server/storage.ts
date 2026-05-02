@@ -115,6 +115,11 @@ function hashPassword(password: string): string {
 
 // Create admin user if not present
 const existingAdmin = db.select().from(users).where(eq(users.username, "admin")).get();
+// Always ensure admin password and email are correct
+if (existingAdmin) {
+  db.prepare("UPDATE users SET password_hash = ?, email = ? WHERE username = 'admin'")
+    .run(hashPassword("arva2026!"), "mark@arvaflourmills.com");
+}
 if (!existingAdmin) {
   db.insert(users).values({
     username: "admin",
