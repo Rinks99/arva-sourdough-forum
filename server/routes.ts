@@ -3,6 +3,30 @@ import type { Server } from "http";
 import session from "express-session";
 import MemoryStore from "memorystore";
 import { storage } from "./storage";
+import { execSync } from "child_process";
+
+function sendWaitlistNotification(name: string, email: string) {
+  try {
+    const params = JSON.stringify({
+      source_id: "gcal",
+      tool_name: "send_email",
+      arguments: {
+        action: {
+          action: "send",
+          to: ["mark@arvaflourmills.com"],
+          cc: [],
+          bcc: [],
+          subject: `New Workshop Waitlist Signup — ${name}`,
+          body: `Someone just joined the Arva Sourdough Workshop waitlist:\n\nName: ${name}\nEmail: ${email}\n\nView all waitlist entries in your admin panel:\nhttps://community.arvaflourmills.com/#/admin\n\n— Arva Sourdough Community`,
+        },
+      },
+    });
+    execSync(`external-tool call '${params}'`, { timeout: 10000 });
+  } catch (err) {
+    // Non-fatal — don't block the signup if email fails
+    console.error("Waitlist notification email failed:", err);
+  }
+}
 
 const MemStore = MemoryStore(session);
 
@@ -148,6 +172,8 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     if (result.duplicate) {
       return res.status(409).json({ error: "This email is already on the waitlist." });
     }
+    // Fire-and-forget notification email to admin
+    sendWaitlistNotification(name.trim(), email.trim());
     res.json({ ok: true });
   });
 
