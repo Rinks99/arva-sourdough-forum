@@ -43,6 +43,7 @@ sqlite.exec(`
     title TEXT NOT NULL,
     category_id INTEGER NOT NULL,
     author_id INTEGER NOT NULL,
+    flair TEXT,
     is_pinned INTEGER NOT NULL DEFAULT 0,
     is_locked INTEGER NOT NULL DEFAULT 0,
     view_count INTEGER NOT NULL DEFAULT 0,
@@ -51,6 +52,7 @@ sqlite.exec(`
     last_reply_user_id INTEGER,
     created_at INTEGER NOT NULL
   );
+
   CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     thread_id INTEGER NOT NULL,
@@ -78,6 +80,8 @@ sqlite.exec(`
 
 // Migrate: add image_url column if it doesn't exist
 try { sqlite.exec(`ALTER TABLE posts ADD COLUMN image_url TEXT`); } catch (_) {}
+// Migrate: add flair column to threads if it doesn't exist
+try { sqlite.exec(`ALTER TABLE threads ADD COLUMN flair TEXT`); } catch (_) {}
 
 // Seed categories and admin if not already present
 const existingCategories = db.select().from(categories).all();
