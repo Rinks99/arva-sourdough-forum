@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +65,12 @@ export default function AuthModal({ mode, onClose, onSwitch }: Props) {
               onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required data-testid="input-email" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              {mode === "login" && (
+                <Link href="/forgot-password"><span className="text-xs text-primary hover:underline cursor-pointer">Forgot password?</span></Link>
+              )}
+            </div>
             <Input id="password" type="password" placeholder="••••••••" value={form.password}
               onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required data-testid="input-password" />
           </div>

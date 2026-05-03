@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -24,7 +24,7 @@ interface Post {
   likeCount: number;
   likedByMe: boolean;
   createdAt: number;
-  author: { id: number; displayName: string; username: string; role: string };
+  author: { id: number; displayName: string; username: string; role: string; avatarUrl?: string };
 }
 
 interface Thread {
@@ -259,6 +259,7 @@ export default function ThreadPage() {
               <CardContent className="p-5">
                 <div className="flex gap-3">
                   <Avatar className="h-8 w-8 shrink-0">
+                    {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt={post.author.displayName} />}
                     <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
                       {post.author.displayName.substring(0, 2).toUpperCase()}
                     </AvatarFallback>

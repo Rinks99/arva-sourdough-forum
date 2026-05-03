@@ -141,7 +141,7 @@ export default function AdminPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={Users} label="Members" value={stats?.totalUsers ?? 0} color="bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" />
         <StatCard icon={MessageSquare} label="Threads" value={stats?.totalThreads ?? 0} color="bg-primary/10 text-primary" />
-        <StatCard icon={FileText} label="Posts" value={stats?.totalPosts ?? 0} color="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" />
+        <StatCard icon={FileText} label="Comments" value={stats?.totalPosts ?? 0} color="bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" />
         <StatCard icon={ClipboardList} label="Waitlist" value={stats?.waitlistCount ?? 0} color="bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400" />
       </div>
 

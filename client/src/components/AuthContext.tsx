@@ -7,6 +7,7 @@ interface AuthUser {
   email: string;
   displayName: string;
   bio?: string;
+  avatarUrl?: string;
   role: string;
   createdAt: number;
 }

@@ -10,8 +10,11 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
   bio: text("bio"),
+  avatarUrl: text("avatar_url"),
   role: text("role").notNull().default("member"), // 'member' | 'admin'
   createdAt: integer("created_at").notNull(),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpiry: integer("password_reset_expiry"),
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({

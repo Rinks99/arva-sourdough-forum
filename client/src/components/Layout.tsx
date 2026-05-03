@@ -1,10 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
-import { Search, Sun, Moon, Menu, X, Wheat, LogOut, User, PenSquare, Shield } from "lucide-react";
+import { useState, useRef } from "react";
+import { Search, Sun, Moon, Menu, X, Wheat, LogOut, User, PenSquare, Shield, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/components/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import AuthModal from "@/components/AuthModal";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -13,6 +15,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const qc = useQueryClient();
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        await apiRequest("POST", "/api/auth/avatar", { avatarUrl: reader.result as string });
+        qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      } catch (err) {
+        console.error("Avatar upload failed", err);
+      } finally {
+        setAvatarUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
   const [authModal, setAuthModal] = useState<"login" | "register" | null>(null);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -71,6 +94,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
             {user ? (
               <div className="flex items-center gap-1.5">
+                {/* Avatar with click-to-upload */}
+                <div
+                  className="relative w-7 h-7 rounded-full overflow-hidden cursor-pointer group shrink-0"
+                  onClick={() => avatarInputRef.current?.click()}
+                  title="Change profile photo"
+                  data-testid="button-avatar-upload"
+                >
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-red-100 flex items-center justify-center">
+                      <span className="text-red-700 text-xs font-bold">{user.displayName.charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="w-3 h-3 text-white" />
+                  </div>
+                </div>
+                <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                 <span className="text-xs text-muted-foreground hidden sm:block max-w-[100px] truncate">{user.displayName}</span>
                 {user.role === "admin" && (
                   <Button variant="ghost" size="icon" asChild className="h-8 w-8" aria-label="Admin panel" data-testid="button-admin-panel">

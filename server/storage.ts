@@ -82,6 +82,10 @@ sqlite.exec(`
 try { sqlite.exec(`ALTER TABLE posts ADD COLUMN image_url TEXT`); } catch (_) {}
 // Migrate: add flair column to threads if it doesn't exist
 try { sqlite.exec(`ALTER TABLE threads ADD COLUMN flair TEXT`); } catch (_) {}
+// Migrate: add avatar_url and password reset columns to users
+try { sqlite.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`); } catch (_) {}
+try { sqlite.exec(`ALTER TABLE users ADD COLUMN password_reset_token TEXT`); } catch (_) {}
+try { sqlite.exec(`ALTER TABLE users ADD COLUMN password_reset_expiry INTEGER`); } catch (_) {}
 
 // Seed categories and admin if not already present
 const existingCategories = db.select().from(categories).all();
@@ -468,6 +472,10 @@ export interface IStorage {
   // Auth
   getUserByEmail(email: string): User | undefined;
   getUserByUsername(username: string): User | undefined;
+  setPasswordResetToken(email: string, token: string, expiry: number): boolean;
+  getUserByResetToken(token: string): User | undefined;
+  resetPassword(token: string, newHash: string): boolean;
+  updateAvatar(userId: number, avatarUrl: string): void;
   getUserById(id: number): User | undefined;
   createUser(data: Omit<InsertUser, "passwordHash"> & { password: string }): User;
   verifyPassword(user: User, password: string): boolean;
@@ -526,6 +534,31 @@ export const storage: IStorage = {
   },
   verifyPassword(user, password) {
     return user.passwordHash === hashPassword(password);
+  },
+
+  setPasswordResetToken(email, token, expiry) {
+    const user = db.select().from(users).where(eq(users.email, email)).get();
+    if (!user) return false;
+    db.prepare("UPDATE users SET password_reset_token = ?, password_reset_expiry = ? WHERE email = ?")
+      .run(token, expiry, email);
+    return true;
+  },
+
+  getUserByResetToken(token) {
+    return db.prepare("SELECT * FROM users WHERE password_reset_token = ?").get(token) as User | undefined;
+  },
+
+  resetPassword(token, newHash) {
+    const user = db.prepare("SELECT * FROM users WHERE password_reset_token = ?").get(token) as User | undefined;
+    if (!user) return false;
+    if (user.passwordResetExpiry && user.passwordResetExpiry < Date.now()) return false;
+    db.prepare("UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expiry = NULL WHERE id = ?")
+      .run(newHash, user.id);
+    return true;
+  },
+
+  updateAvatar(userId, avatarUrl) {
+    db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatarUrl, userId);
   },
 
   getCategories() {

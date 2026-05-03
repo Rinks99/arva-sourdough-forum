@@ -84,6 +84,58 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     res.json(safeUser);
   });
 
+  // ─── Forgot / Reset Password ──────────────────────────
+  app.post("/api/auth/forgot-password", (req, res) => {
+    const { email } = req.body;
+    if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
+    const crypto = require("crypto");
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiry = Date.now() + 60 * 60 * 1000; // 1 hour
+    const found = storage.setPasswordResetToken(email.trim().toLowerCase(), token, expiry);
+    // Always return success (don't reveal if email exists)
+    if (found) {
+      // Send reset email
+      try {
+        const { execSync } = require("child_process");
+        const params = JSON.stringify({
+          source_id: "gcal",
+          tool_name: "send_email",
+          arguments: {
+            to: email.trim(),
+            subject: "Reset your Arva Sourdough Community password",
+            body: `Hi,\n\nYou requested a password reset for your Arva Sourdough Community account.\n\nClick the link below to reset your password (valid for 1 hour):\n\nhttps://community.arvaflourmills.com/#/reset-password?token=${token}\n\nIf you didn't request this, you can safely ignore this email.\n\n— Arva Flour Mills`,
+          },
+        });
+        execSync(`external-tool call '${params}'`, { timeout: 10000 });
+      } catch (e) {
+        console.error("Reset email failed:", e);
+      }
+    }
+    res.json({ ok: true, message: "If that email is registered, a reset link has been sent." });
+  });
+
+  app.post("/api/auth/reset-password", (req, res) => {
+    const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ error: "Token and password are required." });
+    if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
+    const crypto = require("crypto");
+    const newHash = crypto.createHash("sha256").update(password + "arva-salt-2026").digest("hex");
+    const ok = storage.resetPassword(token, newHash);
+    if (!ok) return res.status(400).json({ error: "Reset link is invalid or has expired." });
+    res.json({ ok: true });
+  });
+
+  // ─── Avatar Upload ────────────────────────────────────
+  app.post("/api/auth/avatar", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const { avatarUrl } = req.body;
+    if (!avatarUrl) return res.status(400).json({ error: "No image provided." });
+    if (avatarUrl.length > 5 * 1024 * 1024) return res.status(400).json({ error: "Image too large." });
+    storage.updateAvatar(userId, avatarUrl);
+    res.json({ ok: true });
+  });
+
   // ─── Categories ───────────────────────────────────────
   app.get("/api/categories", (_req, res) => {
     res.json(storage.getCategories());

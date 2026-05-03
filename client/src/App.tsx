@@ -11,6 +11,8 @@ import ThreadPage from "@/pages/ThreadPage";
 import NewThreadPage from "@/pages/NewThreadPage";
 import SearchPage from "@/pages/SearchPage";
 import AdminPage from "@/pages/AdminPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import NotFound from "@/pages/not-found";
 
 function App() {
@@ -26,6 +28,8 @@ function App() {
               <Route path="/new-thread" component={NewThreadPage} />
               <Route path="/search" component={SearchPage} />
               <Route path="/admin" component={AdminPage} />
+              <Route path="/forgot-password" component={ForgotPasswordPage} />
+              <Route path="/reset-password" component={ResetPasswordPage} />
               <Route component={NotFound} />
             </Switch>
           </Layout>
