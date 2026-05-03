@@ -80,6 +80,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
 
+          {/* Back to main site */}
+          <a
+            href="https://arvaflourmills.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            arvaflourmills.com
+          </a>
+
           {/* Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-sm">
             <div className="relative">
@@ -160,14 +171,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Footer */}
       <footer className="border-t border-border mt-16 py-8 text-center text-xs text-muted-foreground">
-        <p>
-          <a href="https://arvaflourmills.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
+        <p className="mb-1">
+          <a href="https://arvaflourmills.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors font-medium">
             Arva Flour Mills
           </a>
-          {" · "}Sourdough Community{" · "}
-          <a href="https://arvaflourmills.com" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-            Shop our flours
-          </a>
+          {" · "}Sourdough Community
+        </p>
+        <p className="flex items-center justify-center gap-3 flex-wrap">
+          <a href="https://arvaflourmills.com/collections" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Shop Flours</a>
+          <span>·</span>
+          <a href="https://arvaflourmills.com/pages/flour-guide" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Flour Guide</a>
+          <span>·</span>
+          <a href="https://arvaflourmills.com/pages/about-us" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">About the Mill</a>
+          <span>·</span>
+          <a href="https://arvaflourmills.com/pages/wholesale-orders" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Wholesale</a>
         </p>
       </footer>
 
