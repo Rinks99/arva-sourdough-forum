@@ -4,6 +4,7 @@ import session from "express-session";
 import MemoryStore from "memorystore";
 import { storage } from "./storage";
 import { execSync } from "child_process";
+import crypto from "crypto";
 
 function sendWaitlistNotification(name: string, email: string) {
   try {
@@ -88,7 +89,6 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
   app.post("/api/auth/forgot-password", (req, res) => {
     const { email } = req.body;
     if (!email?.trim()) return res.status(400).json({ error: "Email is required." });
-    const crypto = require("crypto");
     const token = crypto.randomBytes(32).toString("hex");
     const expiry = Date.now() + 60 * 60 * 1000; // 1 hour
     const found = storage.setPasswordResetToken(email.trim().toLowerCase(), token, expiry);
@@ -118,7 +118,6 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     const { token, password } = req.body;
     if (!token || !password) return res.status(400).json({ error: "Token and password are required." });
     if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters." });
-    const crypto = require("crypto");
     const newHash = crypto.createHash("sha256").update(password + "arva-salt-2026").digest("hex");
     const ok = storage.resetPassword(token, newHash);
     if (!ok) return res.status(400).json({ error: "Reset link is invalid or has expired." });
