@@ -480,6 +480,118 @@ if (adminSeed) {
   }
 }
 
+// ─── One-time recipe migration: weight-first format + Daisy flour branding ───
+// Safe: uses LIKE checks so only runs when old content is present
+try {
+  // Update Einkorn Sourdough: volume-only → weight-first
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 5 cups whole grain einkorn flour', '- 600g (5 cups) whole grain einkorn flour') WHERE content LIKE '%5 cups whole grain einkorn flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 1/4 cup water', '- 300g (1¼ cups) water') WHERE content LIKE '%1 1/4 cup water%' AND content LIKE '%einkorn%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 cup sourdough starter', '- 240g (1 cup) sourdough starter') WHERE content LIKE '%1 cup sourdough starter%' AND content LIKE '%einkorn%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1.5 tsp salt', '- 9g (1½ tsp) salt') WHERE content LIKE '%1.5 tsp salt%' AND content LIKE '%einkorn%'`).run();
+
+  // Update Einkorn Pizza: volume-only → weight-first
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 6 cups all-purpose einkorn flour', '- 720g (6 cups) all-purpose einkorn flour') WHERE content LIKE '%6 cups all-purpose einkorn flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 2 tsp fine sea salt', '- 12g (2 tsp) fine sea salt') WHERE content LIKE '%2 tsp fine sea salt%' AND content LIKE '%einkorn%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/2 tsp dried basil', '- ½ tsp dried basil') WHERE content LIKE '%1/2 tsp dried basil%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/4 tsp crushed red pepper flakes', '- ¼ tsp crushed red pepper flakes') WHERE content LIKE '%1/4 tsp crushed red pepper flakes%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 2 Tbsp extra virgin olive oil', '- 28g (2 tbsp) extra virgin olive oil') WHERE content LIKE '%2 Tbsp extra virgin olive oil%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/4 cup sourdough starter', '- 60g (¼ cup) sourdough starter') WHERE content LIKE '%1/4 cup sourdough starter%' AND content LIKE '%einkorn%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 1/2 cups water', '- 360g (1½ cups) water') WHERE content LIKE '%1 1/2 cups water%' AND content LIKE '%einkorn%'`).run();
+
+  // Update Sandwich Bread: weights-only → add volume parens
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 430g Arva Daisy Unbleached Hard Flour', '- 430g (3½ cups) Arva Daisy Unbleached Hard Flour') WHERE content LIKE '%430g Arva Daisy Unbleached Hard Flour%' AND content LIKE '%sandwich%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 180g water', '- 180g (¾ cup) water') WHERE content LIKE '%430g%' AND content LIKE '%sandwich%' AND content LIKE '%- 180g water%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 100g milk', '- 100g (6½ tbsp) milk') WHERE content LIKE '%430g%' AND content LIKE '%sandwich%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 100g ripe starter', '- 100g (6½ tbsp) ripe starter') WHERE content LIKE '%100g ripe starter%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 56g unsalted butter, softened', '- 56g (¼ cup) unsalted butter, softened') WHERE content LIKE '%56g unsalted butter%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 25g sugar', '- 25g (2 tbsp) sugar') WHERE content LIKE '%430g%' AND content LIKE '%sandwich%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 8g salt', '- 8g (1⅓ tsp) salt') WHERE content LIKE '%430g%' AND content LIKE '%sandwich%'`).run();
+
+  // Update Whole Emmer: weights-only → add volume parens
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 530g whole emmer flour', '- 530g (4½ cups) whole emmer flour') WHERE content LIKE '%530g whole emmer flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 8g salt', '- 8g (1⅓ tsp) salt') WHERE content LIKE '%530g whole emmer flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 360g water', '- 360g (1½ cups) water') WHERE content LIKE '%530g whole emmer flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 75g honey', '- 75g (3½ tbsp) honey') WHERE content LIKE '%530g whole emmer flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 80g active starter', '- 80g (⅓ cup) active starter') WHERE content LIKE '%530g whole emmer flour%'`).run();
+
+  // Update Sourdough Rye: volume-only → weight-first
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 2 cups Dark Rye Flour', '- 204g (2 cups) Dark Rye Flour') WHERE content LIKE '%2 cups Dark Rye Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 cup bread flour', '- 120g (1 cup) bread flour') WHERE content LIKE '%204g (2 cups) Dark Rye Flour%' OR content LIKE '%2 cups Dark Rye Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 tsp salt', '- 6g (1 tsp) salt') WHERE content LIKE '%Dark Rye Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/2 cup sourdough starter', '- 120g (½ cup) sourdough starter') WHERE content LIKE '%Dark Rye Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/2 tsp sugar', '- 2g (½ tsp) sugar') WHERE content LIKE '%Dark Rye Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 3/4 cup warm water', '- 180g (¾ cup) warm water') WHERE content LIKE '%Dark Rye Flour%'`).run();
+
+  // Update Classic Red Fife cookbook: volume-only → weight-first
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 2 cups Whole Red Fife Flour', '- 240g (2 cups) Whole Red Fife Flour') WHERE content LIKE '%Whole Red Fife Flour%' AND content LIKE '%Chapter 6%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 cup bread flour', '- 120g (1 cup) bread flour') WHERE content LIKE '%Whole Red Fife Flour%' AND content LIKE '%Chapter 6%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/2 cup active sourdough starter', '- 120g (½ cup) active sourdough starter') WHERE content LIKE '%Whole Red Fife Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1/2 cup active, bubbly sourdough starter', '- 120g (½ cup) active, bubbly sourdough starter') WHERE content LIKE '%Whole Red Fife Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 1 tsp salt', '- 6g (1 tsp) salt') WHERE content LIKE '%Whole Red Fife Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 3/4 cup warm water', '- 180g (¾ cup) warm water') WHERE content LIKE '%Whole Red Fife Flour%'`).run();
+
+  // Replace all Arva All-Purpose flour references → Daisy Hard Unbleached Flour (All Purpose)
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    'Arva All-Purpose Flour', 'Daisy Hard Unbleached Flour (All Purpose)') WHERE content LIKE '%Arva All-Purpose Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    'Arva All Purpose Flour', 'Daisy Hard Unbleached Flour (All Purpose)') WHERE content LIKE '%Arva All Purpose Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    'Arva All-Purpose or Whole Wheat Flour', 'Daisy Hard Unbleached Flour (All Purpose) or Whole Wheat Flour') WHERE content LIKE '%Arva All-Purpose or Whole Wheat Flour%'`).run();
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '[Arva All-Purpose Flour](https://arvaflourmills.com/products/all-purpose-flour)', '[Daisy Hard Unbleached Flour (All Purpose)](https://arvaflourmills.com/products/all-purpose-flour)') WHERE content LIKE '%[Arva All-Purpose Flour]%'`).run();
+
+  // Add volume to pancakes 120g flour
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 120g Daisy Hard Unbleached Flour (All Purpose)', '- 120g (1 cup) Daisy Hard Unbleached Flour (All Purpose)') WHERE content LIKE '%120g Daisy Hard Unbleached Flour%'`).run();
+  // Crackers 60g flour
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 60g Daisy Hard Unbleached Flour (All Purpose)', '- 60g (½ cup) Daisy Hard Unbleached Flour (All Purpose)') WHERE content LIKE '%60g Daisy Hard Unbleached Flour%'`).run();
+  // Banana bread 250g flour
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 250g Daisy Hard Unbleached Flour (All Purpose)', '- 250g (2 cups) Daisy Hard Unbleached Flour (All Purpose)') WHERE content LIKE '%250g Daisy Hard Unbleached Flour%'`).run();
+  // First Loaf guide 450g flour
+  sqlite.prepare(`UPDATE posts SET content = REPLACE(content,
+    '- 450g Daisy Hard Unbleached Flour (All Purpose)', '- 450g (3¾ cups) Daisy Hard Unbleached Flour (All Purpose)') WHERE content LIKE '%450g Daisy Hard Unbleached Flour%'`).run();
+} catch (e) {
+  // Migration errors are non-fatal
+  console.warn('Recipe migration warning:', e);
+}
+
 export interface IStorage {
   // Auth
   getUserByEmail(email: string): User | undefined;
