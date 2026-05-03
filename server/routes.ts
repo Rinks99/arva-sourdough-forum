@@ -203,6 +203,30 @@ export function registerRoutes(httpServer: Server, app: Express): Server {
     res.json(result);
   });
 
+  // ─── Reactions ─────────────────────────────────────────
+  app.post("/api/posts/:id/react", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const { reaction } = req.body;
+    const validReactions = ["helpful", "greatBake", "lovePhoto"];
+    if (!reaction || !validReactions.includes(reaction)) {
+      return res.status(400).json({ error: "Invalid reaction" });
+    }
+    const result = storage.toggleReaction(Number(req.params.id), userId, reaction);
+    res.json(result);
+  });
+
+  // ─── Best Answer ─────────────────────────────────────────
+  app.post("/api/posts/:id/best-answer", (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    const { threadId } = req.body;
+    if (!threadId) return res.status(400).json({ error: "threadId required" });
+    const result = storage.markBestAnswer(Number(req.params.id), Number(threadId), userId);
+    if (!result.ok) return res.status(403).json({ error: "Only the thread author or admin can mark a best answer" });
+    res.json({ ok: true });
+  });
+
   // ─── Search ─────────────────────────────────────────────
   app.get("/api/search", (req, res) => {
     const q = String(req.query.q || "").trim();

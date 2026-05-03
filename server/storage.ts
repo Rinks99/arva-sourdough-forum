@@ -86,6 +86,18 @@ try { sqlite.exec(`ALTER TABLE threads ADD COLUMN flair TEXT`); } catch (_) {}
 try { sqlite.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`); } catch (_) {}
 try { sqlite.exec(`ALTER TABLE users ADD COLUMN password_reset_token TEXT`); } catch (_) {}
 try { sqlite.exec(`ALTER TABLE users ADD COLUMN password_reset_expiry INTEGER`); } catch (_) {}
+// Migrate: reactions + best answer + solved
+try { sqlite.exec(`ALTER TABLE posts ADD COLUMN reactions TEXT DEFAULT '{}'`); } catch (_) {}
+try { sqlite.exec(`ALTER TABLE posts ADD COLUMN is_best_answer INTEGER DEFAULT 0`); } catch (_) {}
+try { sqlite.exec(`ALTER TABLE threads ADD COLUMN is_solved INTEGER DEFAULT 0`); } catch (_) {}
+try { sqlite.exec(`CREATE TABLE IF NOT EXISTS post_reactions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  post_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  reaction TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(post_id, user_id, reaction)
+)`); } catch (_) {}
 
 // Seed categories and admin if not already present
 const existingCategories = db.select().from(categories).all();
@@ -121,7 +133,7 @@ function hashPassword(password: string): string {
 const existingAdmin = db.select().from(users).where(eq(users.username, "admin")).get();
 // Always ensure admin password and email are correct
 if (existingAdmin) {
-  db.prepare("UPDATE users SET password_hash = ?, email = ? WHERE username = 'admin'")
+  sqlite.prepare("UPDATE users SET password_hash = ?, email = ? WHERE username = 'admin'")
     .run(hashPassword("arva2026!"), "mark@arvaflourmills.com");
 }
 if (!existingAdmin) {
@@ -493,12 +505,18 @@ export interface IStorage {
   setLocked(threadId: number, locked: boolean): void;
   
   // Posts
-  getPostsByThread(threadId: number, userId?: number): (Post & { author: User; likedByMe: boolean })[];
+  getPostsByThread(threadId: number, userId?: number): (Post & { author: User; likedByMe: boolean; myReactions: Record<string, boolean> })[];
   createPost(data: { threadId: number; authorId: number; content: string; imageUrl?: string }): Post;
   deletePost(postId: number): void;
   
   // Likes
   toggleLike(postId: number, userId: number): { liked: boolean; likeCount: number };
+  
+  // Reactions
+  toggleReaction(postId: number, userId: number, reaction: string): { counts: Record<string, number>; myReactions: Record<string, boolean> };
+  
+  // Best Answer
+  markBestAnswer(postId: number, threadId: number, markerId: number): { ok: boolean };
   
   // Search
   searchThreads(query: string): (Thread & { author: User; category: Category })[];
@@ -539,26 +557,26 @@ export const storage: IStorage = {
   setPasswordResetToken(email, token, expiry) {
     const user = db.select().from(users).where(eq(users.email, email)).get();
     if (!user) return false;
-    db.prepare("UPDATE users SET password_reset_token = ?, password_reset_expiry = ? WHERE email = ?")
+    sqlite.prepare("UPDATE users SET password_reset_token = ?, password_reset_expiry = ? WHERE email = ?")
       .run(token, expiry, email);
     return true;
   },
 
   getUserByResetToken(token) {
-    return db.prepare("SELECT * FROM users WHERE password_reset_token = ?").get(token) as User | undefined;
+    return sqlite.prepare("SELECT * FROM users WHERE password_reset_token = ?").get(token) as User | undefined;
   },
 
   resetPassword(token, newHash) {
-    const user = db.prepare("SELECT * FROM users WHERE password_reset_token = ?").get(token) as User | undefined;
+    const user = sqlite.prepare("SELECT * FROM users WHERE password_reset_token = ?").get(token) as User | undefined;
     if (!user) return false;
     if (user.passwordResetExpiry && user.passwordResetExpiry < Date.now()) return false;
-    db.prepare("UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expiry = NULL WHERE id = ?")
+    sqlite.prepare("UPDATE users SET password_hash = ?, password_reset_token = NULL, password_reset_expiry = NULL WHERE id = ?")
       .run(newHash, user.id);
     return true;
   },
 
   updateAvatar(userId, avatarUrl) {
-    db.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatarUrl, userId);
+    sqlite.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").run(avatarUrl, userId);
   },
 
   getCategories() {
@@ -640,8 +658,57 @@ export const storage: IStorage = {
       const likedByMe = userId
         ? !!db.select().from(likes).where(and(eq(likes.postId, p.id), eq(likes.userId, userId))).get()
         : false;
-      return { ...p, author, likedByMe };
+      // Per-user reaction state
+      const myReactions: Record<string, boolean> = {};
+      if (userId) {
+        const rows = sqlite.prepare("SELECT reaction FROM post_reactions WHERE post_id = ? AND user_id = ?").all(p.id, userId) as { reaction: string }[];
+        for (const r of rows) myReactions[r.reaction] = true;
+      }
+      return { ...p, author, likedByMe, myReactions };
     });
+  },
+
+  toggleReaction(postId: number, userId: number, reaction: string): { counts: Record<string, number>; myReactions: Record<string, boolean> } {
+    const existing = sqlite.prepare("SELECT id FROM post_reactions WHERE post_id = ? AND user_id = ? AND reaction = ?").get(postId, userId, reaction);
+    if (existing) {
+      sqlite.prepare("DELETE FROM post_reactions WHERE post_id = ? AND user_id = ? AND reaction = ?").run(postId, userId, reaction);
+    } else {
+      sqlite.prepare("INSERT INTO post_reactions (post_id, user_id, reaction, created_at) VALUES (?, ?, ?, ?)").run(postId, userId, reaction, Date.now());
+    }
+    // Rebuild counts from post_reactions table
+    const allRows = sqlite.prepare("SELECT reaction, COUNT(*) as cnt FROM post_reactions WHERE post_id = ? GROUP BY reaction").all(postId) as { reaction: string; cnt: number }[];
+    const counts: Record<string, number> = {};
+    for (const r of allRows) counts[r.reaction] = r.cnt;
+    // Update the JSON cache in posts.reactions
+    sqlite.prepare("UPDATE posts SET reactions = ? WHERE id = ?").run(JSON.stringify(counts), postId);
+    // Return per-user state
+    const myRows = sqlite.prepare("SELECT reaction FROM post_reactions WHERE post_id = ? AND user_id = ?").all(postId, userId) as { reaction: string }[];
+    const myReactions: Record<string, boolean> = {};
+    for (const r of myRows) myReactions[r.reaction] = true;
+    return { counts, myReactions };
+  },
+
+  markBestAnswer(postId: number, threadId: number, markerId: number): { ok: boolean } {
+    // Only the thread author or admin can mark
+    const thread = sqlite.prepare("SELECT * FROM threads WHERE id = ?").get(threadId) as any;
+    if (!thread) return { ok: false };
+    const marker = db.select().from(users).where(eq(users.id, markerId)).get();
+    if (!marker) return { ok: false };
+    if (marker.role !== "admin" && thread.author_id !== markerId) return { ok: false };
+    // Check if this post is already the best answer (toggle)
+    const post = db.select().from(posts).where(eq(posts.id, postId)).get();
+    if (!post) return { ok: false };
+    const alreadyBest = post.isBestAnswer === 1;
+    // Clear any existing best answer in this thread
+    sqlite.prepare("UPDATE posts SET is_best_answer = 0 WHERE thread_id = ?").run(threadId);
+    if (alreadyBest) {
+      // Toggle off
+      sqlite.prepare("UPDATE threads SET is_solved = 0 WHERE id = ?").run(threadId);
+    } else {
+      sqlite.prepare("UPDATE posts SET is_best_answer = 1 WHERE id = ?").run(postId);
+      sqlite.prepare("UPDATE threads SET is_solved = 1 WHERE id = ?").run(threadId);
+    }
+    return { ok: true };
   },
 
   createPost({ threadId, authorId, content, imageUrl }) {

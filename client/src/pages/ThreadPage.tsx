@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
-import { ChevronLeft, Heart, Lock, Pin, Send, Eye, ImageIcon, X, MoreVertical, Trash2, PinOff, Tag } from "lucide-react";
+import { ChevronLeft, Heart, Lock, Pin, Send, Eye, ImageIcon, X, MoreVertical, Trash2, PinOff, Tag, Crown, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +23,9 @@ interface Post {
   isFirstPost: number;
   likeCount: number;
   likedByMe: boolean;
+  isBestAnswer: number;
+  reactions: string | null; // JSON: { helpful: 2, greatBake: 1 }
+  myReactions: Record<string, boolean>;
   createdAt: number;
   author: { id: number; displayName: string; username: string; role: string; avatarUrl?: string };
 }
@@ -31,14 +34,21 @@ interface Thread {
   id: number;
   title: string;
   flair: string | null;
+  isSolved: number;
   isPinned: number;
   isLocked: number;
   viewCount: number;
   replyCount: number;
   createdAt: number;
-  author: { displayName: string };
+  author: { id: number; displayName: string };
   category: { name: string; slug: string };
 }
+
+const REACTIONS = [
+  { key: "helpful",   emoji: "🙌", label: "Helpful" },
+  { key: "greatBake", emoji: "🔥", label: "Great Bake" },
+  { key: "lovePhoto", emoji: "😍", label: "Love This" },
+] as const;
 
 const FLAIR_COLOURS: Record<string, string> = {
   "Beginner":       "bg-green-100 text-green-800 border-green-200",
@@ -160,6 +170,34 @@ export default function ThreadPage() {
     onError: () => toast({ title: "Sign in to like posts", variant: "destructive" }),
   });
 
+  const reactMutation = useMutation({
+    mutationFn: async ({ postId, reaction }: { postId: number; reaction: string }) => {
+      const res = await apiRequest("POST", `/api/posts/${postId}/react`, { reaction });
+      return { postId, ...(await res.json()) };
+    },
+    onSuccess: ({ postId, counts, myReactions }) => {
+      qc.setQueryData(["/api/threads", id, "posts"], (old: Post[] | undefined) =>
+        old?.map(p => p.id === postId
+          ? { ...p, reactions: JSON.stringify(counts), myReactions }
+          : p
+        )
+      );
+    },
+    onError: () => toast({ title: "Sign in to react to posts", variant: "destructive" }),
+  });
+
+  const bestAnswerMutation = useMutation({
+    mutationFn: async (postId: number) => {
+      const res = await apiRequest("POST", `/api/posts/${postId}/best-answer`, { threadId: Number(id) });
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/threads", id, "posts"] });
+      qc.invalidateQueries({ queryKey: ["/api/threads", id] });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message || "Could not mark best answer", variant: "destructive" }),
+  });
+
   const deletePostMutation = useMutation({
     mutationFn: async (postId: number) => { await apiRequest("DELETE", `/api/posts/${postId}`); },
     onSuccess: () => {
@@ -188,6 +226,9 @@ export default function ThreadPage() {
     mutationFn: async (locked: boolean) => { await apiRequest("PATCH", `/api/threads/${id}/lock`, { locked }); },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/threads", id] }); toast({ title: "Thread updated" }); },
   });
+
+  // Is current user the thread author or admin?
+  const canMarkBestAnswer = user && thread && (isAdmin || user.id === thread.author.id);
 
   if (threadLoading) return (
     <div className="space-y-4"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-32" /></div>
@@ -240,6 +281,11 @@ export default function ThreadPage() {
         <div className="flex items-center gap-2 flex-wrap mb-1">
           {thread?.isPinned === 1 && <Badge variant="secondary" className="text-xs h-5 gap-1"><Pin className="w-3 h-3" />Pinned</Badge>}
           {thread?.isLocked === 1 && <Badge variant="secondary" className="text-xs h-5 gap-1"><Lock className="w-3 h-3" />Locked</Badge>}
+          {thread?.isSolved === 1 && (
+            <Badge className="text-xs h-5 gap-1 bg-green-100 text-green-800 hover:bg-green-100 border-0">
+              <CheckCircle2 className="w-3 h-3" />Solved
+            </Badge>
+          )}
           {thread?.flair && <FlairBadge flair={thread.flair} />}
         </div>
         <h1 className="text-xl font-bold" style={{ fontFamily: "'Noto Serif', Georgia, serif" }}>{thread?.title}</h1>
@@ -254,77 +300,137 @@ export default function ThreadPage() {
         <div className="space-y-4">{[1,2].map(i => <Skeleton key={i} className="h-28" />)}</div>
       ) : (
         <div className="space-y-4">
-          {posts?.map((post) => (
-            <Card key={post.id} className={post.isFirstPost === 1 ? "border-primary/20" : ""} data-testid={`card-post-${post.id}`}>
-              <CardContent className="p-5">
-                <div className="flex gap-3">
-                  <Avatar className="h-8 w-8 shrink-0">
-                    {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt={post.author.displayName} />}
-                    <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
-                      {post.author.displayName.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className="font-semibold text-sm">{post.author.displayName}</span>
-                      {post.author.role === "admin" && (
-                        <Badge className="text-xs h-5 bg-primary/10 text-primary hover:bg-primary/20 border-0">Staff</Badge>
-                      )}
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-                      </span>
-                      {/* Admin: delete post */}
-                      {isAdmin && post.isFirstPost !== 1 && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" data-testid={`button-admin-post-${post.id}`}>
-                              <MoreVertical className="w-3 h-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-36">
-                            <DropdownMenuItem
-                              onClick={() => { if (confirm("Delete this post?")) deletePostMutation.mutate(post.id); }}
-                              className="gap-2 text-xs text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" /> Delete post
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+          {posts?.map((post) => {
+            const reactionCounts: Record<string, number> = post.reactions ? JSON.parse(post.reactions) : {};
+            const myReactions = post.myReactions || {};
+            // Show Best Answer crown on reply posts (non-first-post) for thread OP or admin
+            const showCrown = canMarkBestAnswer && post.isFirstPost !== 1;
+
+            return (
+              <Card
+                key={post.id}
+                className={`${post.isFirstPost === 1 ? "border-primary/20" : ""} ${post.isBestAnswer === 1 ? "border-green-400 bg-green-50/40" : ""}`}
+                data-testid={`card-post-${post.id}`}
+              >
+                <CardContent className="p-5">
+                  {/* Best Answer banner */}
+                  {post.isBestAnswer === 1 && (
+                    <div className="flex items-center gap-2 mb-3 pb-3 border-b border-green-200 text-green-700 text-xs font-semibold">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      Best Answer — marked as the most helpful reply
                     </div>
-                    <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
-                      {formatContent(post.content)}
-                    </div>
-                    {post.imageUrl && (
-                      <div className="mt-3">
-                        <img
-                          src={post.imageUrl}
-                          alt="Attached photo"
-                          className="max-w-full max-h-96 rounded-lg border border-border object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                          onClick={() => window.open(post.imageUrl!, "_blank")}
-                          data-testid={`img-post-${post.id}`}
-                        />
+                  )}
+                  <div className="flex gap-3">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      {post.author.avatarUrl && <AvatarImage src={post.author.avatarUrl} alt={post.author.displayName} />}
+                      <AvatarFallback className="text-xs bg-primary/10 text-primary font-semibold">
+                        {post.author.displayName.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="font-semibold text-sm">{post.author.displayName}</span>
+                        {post.author.role === "admin" && (
+                          <Badge className="text-xs h-5 bg-primary/10 text-primary hover:bg-primary/20 border-0">Staff</Badge>
+                        )}
+                        <span className="text-xs text-muted-foreground ml-auto">
+                          {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                        </span>
+                        {/* Admin: delete post */}
+                        {isAdmin && post.isFirstPost !== 1 && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" data-testid={`button-admin-post-${post.id}`}>
+                                <MoreVertical className="w-3 h-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-36">
+                              <DropdownMenuItem
+                                onClick={() => { if (confirm("Delete this post?")) deletePostMutation.mutate(post.id); }}
+                                className="gap-2 text-xs text-destructive focus:text-destructive"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete post
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
-                    )}
-                    <div className="mt-3 flex items-center gap-2">
-                      <button
-                        onClick={() => user && likeMutation.mutate(post.id)}
-                        className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors ${
-                          post.likedByMe
-                            ? "text-red-500 bg-red-50 dark:bg-red-900/20"
-                            : "text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        } ${!user ? "cursor-default" : "cursor-pointer"}`}
-                        data-testid={`button-like-${post.id}`}
-                      >
-                        <Heart className={`w-3.5 h-3.5 ${post.likedByMe ? "fill-current" : ""}`} />
-                        {post.likeCount > 0 && <span>{post.likeCount}</span>}
-                      </button>
+                      <div className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-words">
+                        {formatContent(post.content)}
+                      </div>
+                      {post.imageUrl && (
+                        <div className="mt-3">
+                          <img
+                            src={post.imageUrl}
+                            alt="Attached photo"
+                            className="max-w-full max-h-96 rounded-lg border border-border object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => window.open(post.imageUrl!, "_blank")}
+                            data-testid={`img-post-${post.id}`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Reaction row */}
+                      <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+                        {/* Heart / Like */}
+                        <button
+                          onClick={() => user && likeMutation.mutate(post.id)}
+                          className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-md transition-colors ${
+                            post.likedByMe
+                              ? "text-red-500 bg-red-50 dark:bg-red-900/20"
+                              : "text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          } ${!user ? "cursor-default" : "cursor-pointer"}`}
+                          data-testid={`button-like-${post.id}`}
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${post.likedByMe ? "fill-current" : ""}`} />
+                          {post.likeCount > 0 && <span>{post.likeCount}</span>}
+                        </button>
+
+                        {/* Emoji reactions */}
+                        {REACTIONS.map(({ key, emoji, label }) => {
+                          const count = reactionCounts[key] || 0;
+                          const active = !!myReactions[key];
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => user && reactMutation.mutate({ postId: post.id, reaction: key })}
+                              title={user ? (active ? `Remove "${label}"` : `React: ${label}`) : `Sign in to react`}
+                              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-all border ${
+                                active
+                                  ? "bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:border-amber-600 dark:text-amber-400"
+                                  : "bg-transparent border-transparent text-muted-foreground hover:bg-muted hover:border-border"
+                              } ${!user ? "cursor-default" : "cursor-pointer"}`}
+                              data-testid={`button-react-${key}-${post.id}`}
+                            >
+                              <span className="text-base leading-none">{emoji}</span>
+                              {count > 0 && <span className="font-medium">{count}</span>}
+                            </button>
+                          );
+                        })}
+
+                        {/* Best Answer crown (thread OP or admin, on reply posts only) */}
+                        {showCrown && (
+                          <button
+                            onClick={() => bestAnswerMutation.mutate(post.id)}
+                            title={post.isBestAnswer === 1 ? "Remove Best Answer" : "Mark as Best Answer"}
+                            className={`ml-auto flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-all border ${
+                              post.isBestAnswer === 1
+                                ? "bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-600 dark:text-green-400"
+                                : "bg-transparent border-transparent text-muted-foreground hover:bg-green-50 hover:border-green-200 hover:text-green-600"
+                            }`}
+                            data-testid={`button-best-answer-${post.id}`}
+                          >
+                            <Crown className="w-3.5 h-3.5" />
+                            <span>{post.isBestAnswer === 1 ? "Best Answer" : "Mark answer"}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

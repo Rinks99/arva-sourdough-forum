@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
-import { MessageSquare, Eye, Pin, Lock, PenSquare, ChevronLeft, MoreVertical, Trash2, PinOff, Tag } from "lucide-react";
+import { MessageSquare, Eye, Pin, Lock, PenSquare, ChevronLeft, MoreVertical, Trash2, PinOff, Tag, CheckCircle2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ interface Thread {
   id: number;
   title: string;
   flair: string | null;
+  isSolved: number;
   isPinned: number;
   isLocked: number;
   viewCount: number;
@@ -148,6 +149,9 @@ export default function CategoryPage() {
                           )}
                           {thread.isLocked === 1 && (
                             <Badge variant="secondary" className="text-xs h-5 gap-1"><Lock className="w-3 h-3" />Locked</Badge>
+                          )}
+                          {thread.isSolved === 1 && (
+                            <Badge className="text-xs h-5 gap-1 bg-green-100 text-green-800 hover:bg-green-100 border-0"><CheckCircle2 className="w-3 h-3" />Solved</Badge>
                           )}
                           {thread.flair && <FlairBadge flair={thread.flair} />}
                           <h3 className="font-medium text-sm group-hover:text-primary transition-colors">{thread.title}</h3>

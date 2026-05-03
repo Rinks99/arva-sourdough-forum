@@ -40,6 +40,14 @@ export const insertCategorySchema = createInsertSchema(categories).omit({ id: tr
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
 
+// Reaction types
+export const REACTIONS = [
+  { key: "helpful",   emoji: "🙌", label: "Helpful" },
+  { key: "greatBake", emoji: "🔥", label: "Great Bake" },
+  { key: "lovePhoto", emoji: "😍", label: "Love This" },
+] as const;
+export type ReactionKey = typeof REACTIONS[number]["key"];
+
 // Available thread flairs
 export const THREAD_FLAIRS = [
   "Beginner",
@@ -61,6 +69,7 @@ export const threads = sqliteTable("threads", {
   categoryId: integer("category_id").notNull(),
   authorId: integer("author_id").notNull(),
   flair: text("flair"), // optional flair label
+  isSolved: integer("is_solved").default(0),
   isPinned: integer("is_pinned").notNull().default(0),
   isLocked: integer("is_locked").notNull().default(0),
   viewCount: integer("view_count").notNull().default(0),
@@ -92,6 +101,8 @@ export const posts = sqliteTable("posts", {
   imageUrl: text("image_url"),  // optional uploaded photo
   isFirstPost: integer("is_first_post").notNull().default(0),
   likeCount: integer("like_count").notNull().default(0),
+  reactions: text("reactions").default("{}"), // JSON: { helpful: 2, greatBake: 1, lovePhoto: 0 }
+  isBestAnswer: integer("is_best_answer").default(0),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at"),
 });
