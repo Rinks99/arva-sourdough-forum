@@ -480,6 +480,26 @@ if (adminSeed) {
   }
 }
 
+// ─── One-time timestamp fix: correct seed threads stored with seconds instead of ms ───
+// Any thread/post with created_at < 2_000_000_000 was seeded in seconds (Unix epoch ~1970s)
+try {
+  const BAD_THRESHOLD = 2_000_000_000; // anything below this is clearly in seconds, not ms
+  const badThreads = sqlite.prepare("SELECT id FROM threads WHERE created_at < ?").all(BAD_THRESHOLD) as { id: number }[];
+  if (badThreads.length > 0) {
+    // Spread threads across last 30 days
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    badThreads.forEach((t, i) => {
+      const ts = now - (badThreads.length - i) * dayMs;
+      sqlite.prepare("UPDATE threads SET created_at = ? WHERE id = ?").run(ts, t.id);
+      sqlite.prepare("UPDATE posts SET created_at = ? WHERE thread_id = ? AND created_at < ?").run(ts + 60000, t.id, BAD_THRESHOLD);
+    });
+    console.log(`[migration] Fixed ${badThreads.length} threads with bad timestamps`);
+  }
+} catch (e) {
+  console.warn('[migration] Timestamp fix warning:', e);
+}
+
 // ─── One-time recipe migration: weight-first format + Daisy flour branding ───
 // Safe: uses LIKE checks so only runs when old content is present
 try {
