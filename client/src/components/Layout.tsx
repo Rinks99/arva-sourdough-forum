@@ -23,18 +23,34 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const file = e.target.files?.[0];
     if (!file) return;
     setAvatarUploading(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        await apiRequest("POST", "/api/auth/avatar", { avatarUrl: reader.result as string });
-        qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      } catch (err) {
-        console.error("Avatar upload failed", err);
-      } finally {
-        setAvatarUploading(false);
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Resize to max 200x200 before upload
+      const resized = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => {
+          const img = new Image();
+          img.onerror = reject;
+          img.onload = () => {
+            const MAX = 200;
+            const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          };
+          img.src = reader.result as string;
+        };
+        reader.readAsDataURL(file);
+      });
+      await apiRequest("POST", "/api/auth/avatar", { avatarUrl: resized });
+      qc.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    } catch (err) {
+      console.error("Avatar upload failed", err);
+    } finally {
+      setAvatarUploading(false);
+    }
   }
   const [authModal, setAuthModal] = useState<"login" | "register" | null>(null);
 
